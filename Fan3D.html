@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AeroStream 3000 Fan</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            slate: { 800: '#1e293b', 900: '#0f172a' },
+            teal: { 100: '#cffafe', 300: '#5eead4', 500: '#06b6d4' },
+            emerald: { 500: '#10b981' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Fix SVG blur filter in some browsers */
+    svg { overflow: visible; }
+  </style>
+</head>
+<body class="bg-slate-800">
+  <div id="root"></div>
+
+  <!-- Load React & ReactDOM via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Load Babel for JSX transform in browser (only for dev!) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const ControlBtn = ({ x, y, label, active, onClick, color }) => {
+      const activeColor = color === 'red' ? '#f87171' : '#34d399';
+      const inactiveColor = '#334155';
+      
+      return (
+        <g 
+          transform={`translate(${x}, ${y})`} 
+          onClick={onClick} 
+          className="cursor-pointer"
+          style={{ 
+            transform: active ? `translate(${x}px, ${y + 2}px)` : `translate(${x}px, ${y}px)`,
+            transition: 'transform 0.2s'
+          }}
+        >
+          <rect x="-8" y="-5" width="16" height="14" rx="2" fill="#000" opacity="0.3" />
+          <rect 
+            x="-8" y="-8" width="16" height="12" rx="2" 
+            fill={active ? activeColor : inactiveColor} 
+            stroke={active ? '#fff' : 'none'}
+            strokeWidth="1"
+          />
+          <text x="0" y="1" textAnchor="middle" fontSize="8" fill={active ? '#1e293b' : '#94a3b8'} fontWeight="bold">{label}</text>
+        </g>
+      );
+    };
+
+    const FanApp = () => {
+      const [targetSpeed, setTargetSpeed] = useState(0);
+      const [currentSpeed, setCurrentSpeed] = useState(0);
+      const [rotation, setRotation] = useState(0);
+      
+      const requestRef = useRef();
+      const speedRef = useRef(0);
+      const [particles, setParticles] = useState([]);
+
+      const MAX_SPEEDS = [0, 15, 30, 50];
+      const ACCELERATION = 0.5;
+      const DECELERATION = 0.3;
+
+      const animate = () => {
+        const target = MAX_SPEEDS[targetSpeed];
+        if (speedRef.current < target) {
+          speedRef.current = Math.min(speedRef.current + ACCELERATION, target);
+        } else if (speedRef.current > target) {
+          speedRef.current = Math.max(speedRef.current - DECELERATION, target);
+        }
+
+        if (speedRef.current > 0.1) {
+          setRotation(prev => (prev + speedRef.current) % 360);
+        }
+
+        setCurrentSpeed(speedRef.current);
+        requestRef.current = requestAnimationFrame(animate);
+      };
+
+      useEffect(() => {
+        requestRef.current = requestAnimationFrame(animate);
+        return () => {
+          if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        };
+      }, [targetSpeed]);
+
+      useEffect(() => {
+        if (currentSpeed > 10) {
+          const interval = setInterval(() => {
+            const id = Math.random();
+            const startY = 150 + (Math.random() * 200 - 100);
+            setParticles(prev => [...prev, { id, x: 300, y: startY, speed: currentSpeed * 0.8 }]);
+
+            setTimeout(() => {
+              setParticles(prev => prev.filter(p => p.id !== id));
+            }, 1000);
+          }, 200 - (currentSpeed * 3));
+
+          return () => clearInterval(interval);
+        }
+      }, [currentSpeed]);
+
+      useEffect(() => {
+        const interval = setInterval(() => {
+          setParticles(prev => prev.map(p => ({ ...p, x: p.x + p.speed })).filter(p => p.x < 900));
+        }, 16);
+        return () => clearInterval(interval);
+      }, []);
+
+      const vibration = currentSpeed > 40 ? `translate(${Math.random() * 2 - 1}px, ${Math.random() * 2 - 1}px)` : 'translate(0,0)';
+
+      return (
+        <div className="min-h-screen bg-slate-800 flex flex-col items-center justify-center p-4 font-sans selection:bg-teal-500 selection:text-white">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-teal-100 tracking-widest uppercase mb-2">AeroStream 3000</h1>
+            <p className="text-slate-400 text-sm">SVG High-Fidelity Interactive Fan</p>
+          </div>
+
+          <div className="relative w-full max-w-lg aspect-square flex items-center justify-center">
+            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" viewBox="0 0 800 600">
+              {particles.map(p => (
+                <line 
+                  key={p.id} 
+                  x1={p.x} y1={p.y} 
+                  x2={p.x - (p.speed * 2)} y2={p.y} 
+                  stroke="rgba(200, 255, 255, 0.4)" 
+                  strokeWidth={2} 
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
+
+            <svg 
+              width="100%" 
+              height="100%" 
+              viewBox="0 0 500 600" 
+              className="drop-shadow-2xl"
+              style={{ transform: vibration }}
+            >
+              <defs>
+                <linearGradient id="metal-shine" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#334155" />
+                  <stop offset="40%" stopColor="#94a3b8" />
+                  <stop offset="60%" stopColor="#e2e8f0" />
+                  <stop offset="80%" stopColor="#94a3b8" />
+                  <stop offset="100%" stopColor="#334155" />
+                </linearGradient>
+                
+                <linearGradient id="blade-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.9"/>
+                  <stop offset="100%" stopColor="#0f766e" stopOpacity="0.9"/>
+                </linearGradient>
+
+                <linearGradient id="stand-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#1e293b" />
+                  <stop offset="50%" stopColor="#475569" />
+                  <stop offset="100%" stopColor="#0f172a" />
+                </linearGradient>
+
+                <radialGradient id="cage-center" cx="50%" cy="50%" r="50%">
+                  <stop offset="80%" stopColor="#cbd5e1" />
+                  <stop offset="100%" stopColor="#64748b" />
+                </radialGradient>
+
+                {/* ⚠️ Filter cannot be dynamic in HTML — make static */}
+                <filter id="blur-spin">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+                </filter>
+              </defs>
+
+              {/* Base Shadow */}
+              <ellipse cx="250" cy="560" rx="120" ry="30" fill="#000" opacity="0.5" filter="url(#blur-spin)" />
+
+              {/* Neck */}
+              <path d="M230,350 L230,480 Q230,500 200,520 L300,520 Q270,500 270,480 L270,350 Z" fill="url(#metal-shine)" />
+              
+              {/* Base Stand */}
+              <g transform="translate(0, 20)">
+                <ellipse cx="250" cy="520" rx="100" ry="25" fill="#0f172a" />
+                <path d="M150,520 A100,25 0 0,0 350,520 C350,480 310,460 250,460 C190,460 150,480 150,520" fill="url(#stand-gradient)" />
+                <path d="M200,510 L300,510 L290,530 L210,530 Z" fill="#0f172a" opacity="0.6" />
+                
+                <ControlBtn x={220} y={520} label="0" active={targetSpeed === 0} onClick={() => setTargetSpeed(0)} color="red" />
+                <ControlBtn x={240} y={520} label="1" active={targetSpeed === 1} onClick={() => setTargetSpeed(1)} color="emerald" />
+                <ControlBtn x={260} y={520} label="2" active={targetSpeed === 2} onClick={() => setTargetSpeed(2)} color="emerald" />
+                <ControlBtn x={280} y={520} label="3" active={targetSpeed === 3} onClick={() => setTargetSpeed(3)} color="emerald" />
+              </g>
+
+              <g transform="translate(250, 250)">
+                <path d="M-60,-60 L60,-60 L70,60 L-70,60 Z" fill="url(#metal-shine)" transform="rotate(90) translate(-50, 0)" />
+                <ellipse cx="0" cy="0" rx="70" ry="70" fill="#475569" />
+
+                <circle cx="0" cy="0" r="190" fill="none" stroke="#94a3b8" strokeWidth="2" opacity="0.5" />
+                <circle cx="0" cy="0" r="150" fill="none" stroke="#94a3b8" strokeWidth="1" opacity="0.3" />
+                
+                <g transform={`rotate(${rotation})`} filter="url(#blur-spin)">
+                  <path d="M0,0 C20,-40 80,-80 140,-60 C180,-40 170,10 140,20 C80,40 20,20 0,0" fill="url(#blade-gradient)" stroke="#115e59" strokeWidth="1" />
+                  <path d="M0,0 C20,-40 80,-80 140,-60 C180,-40 170,10 140,20 C80,40 20,20 0,0" fill="url(#blade-gradient)" stroke="#115e59" strokeWidth="1" transform="rotate(120)" />
+                  <path d="M0,0 C20,-40 80,-80 140,-60 C180,-40 170,10 140,20 C80,40 20,20 0,0" fill="url(#blade-gradient)" stroke="#115e59" strokeWidth="1" transform="rotate(240)" />
+                  <circle cx="0" cy="0" r="25" fill="url(#cage-center)" />
+                  <circle cx="0" cy="0" r="5" fill="#000" opacity="0.2" transform="translate(5,5)" />
+                </g>
+
+                <circle cx="0" cy="0" r="200" fill="none" stroke="#cbd5e1" strokeWidth="4" />
+                <circle cx="0" cy="0" r="200" fill="none" stroke="#64748b" strokeWidth="2" strokeDasharray="2,4" />
+                
+                {[...Array(12)].map((_, i) => (
+                  <line 
+                    key={i} 
+                    x1="0" y1="0" x2="0" y2="-200" 
+                    stroke="#cbd5e1" 
+                    strokeWidth="1.5" 
+                    transform={`rotate(${i * 30})`} 
+                    opacity="0.8"
+                  />
+                ))}
+
+                <circle cx="0" cy="0" r="50" fill="none" stroke="#cbd5e1" strokeWidth="1" opacity="0.6"/>
+                <circle cx="0" cy="0" r="100" fill="none" stroke="#cbd5e1" strokeWidth="1" opacity="0.6"/>
+                <circle cx="0" cy="0" r="150" fill="none" stroke="#cbd5e1" strokeWidth="1" opacity="0.6"/>
+
+                <circle cx="0" cy="0" r="35" fill="url(#cage-center)" stroke="#94a3b8" strokeWidth="2" />
+                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#1e293b" fontFamily="Arial">AERO</text>
+              </g>
+            </svg>
+
+            <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur p-3 rounded-lg border border-slate-700 text-xs text-teal-300 font-mono">
+              <div>RPM: {Math.round(currentSpeed * 60)}</div>
+              <div>STATUS: {targetSpeed === 0 ? 'IDLE' : `SPEED ${targetSpeed}`}</div>
+              <div className="mt-1 w-24 h-1 bg-slate-700 rounded overflow-hidden">
+                <div 
+                  className="h-full bg-teal-500 transition-all duration-300" 
+                  style={{ width: `${(currentSpeed / 50) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 text-slate-500 text-sm">
+            Interact with the buttons on the fan base to operate.
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<FanApp />);
+  </script>
+</body>
+</html>
